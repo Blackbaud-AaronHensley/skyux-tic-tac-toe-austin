@@ -15,11 +15,20 @@ export class GameRepository {
     if (path.isAbsolute(gamesPath)) {
       this.dataPath = gamesPath;
     }
-    fs.readFile(this.dataPath, 'utf8', (err, data) => {
-      if (err) {
-        return debug(err);
-      }
-      this.games = JSON.parse(data).map(x => Game.fromState(x));
+  }
+
+  load(): Promise<Game[]> {
+    return new Promise((good, bad) => {
+      fs.readFile(this.dataPath, 'utf8', (err, data) => {
+        if (err && err.code !== 'ENOENT') {
+          return bad(err);
+        }
+        else if (err) {
+          data = '[]';
+        }
+        this.games = JSON.parse(data).map(x => Game.fromState(x));
+        good(this.games);
+      });
     });
   }
 
@@ -43,6 +52,7 @@ export class GameRepository {
       return null;
     }
     if (game.play(columnIndex, rowIndex)) {
+      this.writeStorage();
       return game;
     }
     return false;
@@ -53,13 +63,18 @@ export class GameRepository {
     if (index > -1) {
       this.games.splice(index, 1);
     }
+    this.writeStorage();
   }
 
   private addGame(game: Game): Game {
     this.games.push(game);
+    this.writeStorage();
+    return game;
+  }
+
+  private writeStorage(): void {
     fs.writeFile(this.dataPath, JSON.stringify(this.games), err => {
       debug(err);
     });
-    return game;
   }
 }
